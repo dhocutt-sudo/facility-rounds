@@ -8,20 +8,18 @@
   <style>
     body { background-color: #f4f7f6; padding: 12px; font-family: -apple-system, sans-serif; }
     .card { border-radius: 12px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 20px; }
-    .btn-status { height: 75px; font-weight: bold; margin-bottom: 12px; width: 100%; border-radius: 12px; border: 2px solid #ddd; background-color: #f8f9fa; color: #666; transition: all 0.2s; }
-    .active-g { border-color: #198754 !important; background-color: #198754 !important; color: white !important; }
-    .active-y { border-color: #ffc107 !important; background-color: #ffc107 !important; color: #212529 !important; }
-    .active-r { border-color: #dc3545 !important; background-color: #dc3545 !important; color: white !important; }
+    .btn-status { height: 80px; font-weight: bold; margin-bottom: 15px; width: 100%; border-radius: 12px; border: 2px solid #ddd; background-color: #fff; transition: all 0.2s; }
     .hidden { display: none; }
     .locked-header { background: #212529; color: white; padding: 12px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 20px; text-transform: uppercase; }
     #loading { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.95); display:none; justify-content:center; align-items:center; z-index:9999; flex-direction: column; text-align: center; }
+    .staff-label { font-size: 0.75rem; color: #999; text-align: center; margin-top: 25px; }
   </style>
 </head>
 <body>
 
   <div id="loading">
     <div class="spinner-border text-primary mb-3"></div>
-    <h5 id="statusMsg">Connecting...</h5>
+    <h5 id="statusMsg">Updating Registry...</h5>
   </div>
 
   <div id="setupView" class="card hidden">
@@ -33,62 +31,54 @@
 
   <div id="successView" class="card hidden" style="text-align: center;">
     <div style="font-size: 50px;">✅</div>
-    <h3 class="mt-2">Success!</h3>
+    <h3 class="mt-2">All Clear!</h3>
     <p id="successMsg" class="text-muted"></p>
     <button class="btn btn-outline-primary mt-3" onclick="location.reload()">New Report</button>
   </div>
 
   <div id="mainApp" class="hidden">
-    <!-- NAVIGATION -->
     <div id="navTabs" class="btn-group w-100 mb-3 hidden">
       <button class="btn btn-outline-primary active" id="t1" onclick="setMode('round')">Rounds</button>
       <button class="btn btn-outline-primary" id="t2" onclick="setMode('workorder')">Work Order</button>
     </div>
 
-    <!-- ROUNDS MODE -->
     <div id="roundForm" class="card">
       <div id="assetHeader" class="locked-header hidden"></div>
       <div id="assetPicker">
-        <label class="fw-bold mb-2">Asset Status Check</label>
+        <label class="fw-bold mb-2">Facility Status Check</label>
         <select id="assetList" class="form-select form-select-lg mb-4"></select>
       </div>
-      <div id="statusButtons">
-        <button id="bg" class="btn btn-status" onclick="selectStatus('🟢 Online')">🟢 Online</button>
-        <button id="by" class="btn btn-status" onclick="selectStatus('🟡 Issue')">🟡 Issue</button>
-        <button id="br" class="btn btn-status" onclick="selectStatus('🔴 Down')">🔴 Down</button>
-      </div>
-      <div id="notesSection" class="mt-2 hidden">
-        <textarea id="roundNotes" class="form-control mb-3" placeholder="Describe issue..."></textarea>
-      </div>
-      <button id="submitRoundBtn" class="btn btn-primary w-100 p-3 fw-bold mt-2 hidden" onclick="doSubmitRound()">SUBMIT STATUS</button>
+      <button class="btn btn-outline-success btn-status" onclick="doQuickSubmit('🟢 Online')">🟢 Online</button>
+      <button class="btn btn-outline-warning btn-status" onclick="doQuickSubmit('🟡 Issue')">🟡 Issue</button>
+      <button class="btn btn-outline-danger btn-status" onclick="doQuickSubmit('🔴 Down')">🔴 Down</button>
     </div>
 
-    <!-- WORK ORDER MODE -->
     <div id="woForm" class="card hidden">
-      <h5 class="mb-3">New Maintenance Request</h5>
-      <input type="text" id="woLoc" class="form-control mb-2" placeholder="Location *">
-      <textarea id="woIssue" class="form-control mb-2" rows="3" placeholder="Issue *"></textarea>
-      <select id="woPriority" class="form-select mb-2">
+      <h5 class="mb-3">Maintenance Request</h5>
+      <label class="small fw-bold">Location *</label>
+      <input type="text" id="woLoc" class="form-control mb-2">
+      <label class="small fw-bold">Describe Issue *</label>
+      <textarea id="woIssue" class="form-control mb-2" rows="3" placeholder="Explain the problem..."></textarea>
+      <label class="small fw-bold">Priority *</label>
+      <select id="woPriority" class="form-select mb-3">
         <option value="Low (L): No safety risk. The request is purely cosmetic, or would be nice to have.">Low (L): Cosmetic</option>
         <option value="Medium (M): No safety risk. The damage caused by the Incident only marginally increases over time.">Medium (M): No safety risk</option>
         <option value="High (H): The safety risk and damage caused by the problem increases considerably over time.">High (H): Safety Risk</option>
-        <option value="Security risk">Security risk</option>
+        <option value="Security risk">Security Risk</option>
       </select>
       <button class="btn btn-primary w-100 p-3 fw-bold" onclick="doSubmitWO()">SUBMIT WORK ORDER</button>
     </div>
 
-    <div class="text-center mt-4 small text-muted">
+    <div class="staff-label">
       Logged in: <span id="sName"></span> | <a href="#" onclick="logout()">Logout</a>
     </div>
   </div>
 
   <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyAKiDGXHrwJ2cEcJf9lr9ZOVV59eeCADibBpsnWg5RIBY-ikgxqfWsM80DIWlpmLEFyg/exec";
-    
     const params = new URLSearchParams(window.location.search);
     const assetParam = params.get('asset');
     let modeParam = params.get('mode') || (assetParam ? 'round' : 'admin');
-    let selectedStatus = "";
 
     window.onload = function() {
       const name = localStorage.getItem('staffName');
@@ -99,7 +89,7 @@
     function saveIdentity() {
       const n = document.getElementById('setupName').value;
       const e = document.getElementById('setupEmail').value;
-      if (n.length < 2) return alert("Enter your name.");
+      if (n.length < 2) return alert("Name required.");
       localStorage.setItem('staffName', n);
       localStorage.setItem('staffEmail', e);
       startApp(n);
@@ -111,10 +101,7 @@
       document.getElementById('setupView').classList.add('hidden');
       document.getElementById('mainApp').classList.remove('hidden');
       document.getElementById('sName').innerText = n;
-      
-      fetch(SCRIPT_URL)
-        .then(res => res.json())
-        .then(list => {
+      fetch(SCRIPT_URL).then(res => res.json()).then(list => {
            const sel = document.getElementById('assetList');
            list.forEach(a => {
              let opt = document.createElement('option');
@@ -122,20 +109,15 @@
              if(assetParam && a.toLowerCase() === assetParam.toLowerCase()) opt.selected = true;
              sel.appendChild(opt);
            });
-        });
-
+      });
       if (assetParam) {
         document.getElementById('assetHeader').innerText = assetParam;
         document.getElementById('assetHeader').classList.remove('hidden');
         document.getElementById('assetPicker').classList.add('hidden');
         document.getElementById('woLoc').value = assetParam;
-      }
-      
-      // If we ARE NOT in admin mode (e.g. forced via URL), hide the navigation tabs
-      if (modeParam === 'admin') {
+      } else if (modeParam === 'admin') {
         document.getElementById('navTabs').classList.remove('hidden');
       }
-
       setMode(modeParam);
     }
 
@@ -143,77 +125,63 @@
       modeParam = m;
       document.getElementById('roundForm').classList.toggle('hidden', m !== 'round');
       document.getElementById('woForm').classList.toggle('hidden', m !== 'workorder');
-      document.getElementById('t1').classList.toggle('active', m === 'round');
-      document.getElementById('t2').classList.toggle('active', m === 'workorder');
     }
 
-    function selectStatus(s) {
-      selectedStatus = s;
-      document.getElementById('submitRoundBtn').classList.remove('hidden');
-      document.getElementById('bg').className = "btn btn-status" + (s.includes('🟢') ? ' active-g' : '');
-      document.getElementById('by').className = "btn btn-status" + (s.includes('🟡') ? ' active-y' : '');
-      document.getElementById('br').className = "btn btn-status" + (s.includes('🔴') ? ' active-r' : '');
-      document.getElementById('notesSection').classList.toggle('hidden', s.includes('🟢'));
+    function doQuickSubmit(status) {
+      const currentAsset = assetParam || document.getElementById('assetList').value;
+      showLoad("Updating Registry...");
       
-      const subBtn = document.getElementById('submitRoundBtn');
-      if(s.includes('🟢')) subBtn.className = "btn btn-success w-100 p-3 mt-2 fw-bold";
-      else if(s.includes('🟡')) subBtn.className = "btn btn-warning w-100 p-3 mt-2 fw-bold";
-      else subBtn.className = "btn btn-danger w-100 p-3 mt-2 fw-bold";
-    }
-
-    function doSubmitRound() {
-      const notes = document.getElementById('roundNotes').value;
-      if (!selectedStatus.includes('🟢') && notes.length < 3) return alert("Please add notes.");
-      sendData({
-        type: "ROUND",
-        asset: assetParam || document.getElementById('assetList').value,
-        status: selectedStatus,
-        notes: notes,
-        staff: localStorage.getItem('staffName')
-      }, true);
-    }
-
-    function doSubmitWO() {
-      sendData({
-        type: "WORKORDER",
-        location: document.getElementById('woLoc').value,
-        issue: document.getElementById('woIssue').value,
-        priority: document.getElementById('woPriority').value,
-        staff: localStorage.getItem('staffName'),
-        email: localStorage.getItem('staffEmail'),
-        wantsUpdate: true
-      }, false);
-    }
-
-    function sendData(payload, isRound) {
-      document.getElementById('statusMsg').innerText = "Submitting...";
-      document.getElementById('loading').style.display = 'flex';
       fetch(SCRIPT_URL, {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          type: "ROUND",
+          asset: currentAsset,
+          status: status,
+          staff: localStorage.getItem('staffName')
+        })
       })
       .then(res => res.json())
       .then(res => {
         document.getElementById('loading').style.display = 'none';
-        
-        // --- REDIRECTION LOGIC ---
-        if (isRound && !selectedStatus.includes('🟢')) {
-          // If Round was Yellow or Red, redirect to Work Order
-          alert("Status Recorded. Redirecting to file a Work Order...");
-          document.getElementById('woLoc').value = payload.asset;
+        if (!status.includes('🟢')) {
+          alert(status + " recorded. Please provide details in the Work Order.");
           setMode('workorder');
-          window.scrollTo(0,0);
         } else {
-          // Otherwise, show final success screen
           document.getElementById('mainApp').classList.add('hidden');
           document.getElementById('successView').classList.remove('hidden');
-          document.getElementById('successMsg').innerText = res.message;
+          document.getElementById('successMsg').innerText = currentAsset + " is Online.";
         }
-      })
-      .catch(err => {
-        document.getElementById('loading').style.display = 'none';
-        alert("Submission failed. Check your signal.");
       });
+    }
+
+    function doSubmitWO() {
+      const loc = document.getElementById('woLoc').value;
+      const iss = document.getElementById('woIssue').value;
+      if (!loc || !iss) return alert("Fill in required fields.");
+      showLoad("Sending to Maintenance...");
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          type: "WORKORDER",
+          location: loc,
+          issue: iss,
+          priority: document.getElementById('woPriority').value,
+          staff: localStorage.getItem('staffName'),
+          email: localStorage.getItem('staffEmail')
+        })
+      })
+      .then(res => res.json())
+      .then(res => {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('mainApp').classList.add('hidden');
+        document.getElementById('successView').classList.remove('hidden');
+        document.getElementById('successMsg').innerText = res.message;
+      });
+    }
+
+    function showLoad(m) {
+      document.getElementById('statusMsg').innerText = m;
+      document.getElementById('loading').style.display = 'flex';
     }
   </script>
 </body>
