@@ -39,11 +39,13 @@
   </div>
 
   <div id="mainApp" class="hidden">
+    <!-- NAVIGATION -->
     <div id="navTabs" class="btn-group w-100 mb-3 hidden">
       <button class="btn btn-outline-primary active" id="t1" onclick="setMode('round')">Rounds</button>
       <button class="btn btn-outline-primary" id="t2" onclick="setMode('workorder')">Work Order</button>
     </div>
 
+    <!-- ROUNDS MODE -->
     <div id="roundForm" class="card">
       <div id="assetHeader" class="locked-header hidden"></div>
       <div id="assetPicker">
@@ -61,8 +63,9 @@
       <button id="submitRoundBtn" class="btn btn-primary w-100 p-3 fw-bold mt-2 hidden" onclick="doSubmitRound()">SUBMIT STATUS</button>
     </div>
 
+    <!-- WORK ORDER MODE -->
     <div id="woForm" class="card hidden">
-      <h5 class="mb-3">New Request</h5>
+      <h5 class="mb-3">New Maintenance Request</h5>
       <input type="text" id="woLoc" class="form-control mb-2" placeholder="Location *">
       <textarea id="woIssue" class="form-control mb-2" rows="3" placeholder="Issue *"></textarea>
       <select id="woPriority" class="form-select mb-2">
@@ -80,12 +83,11 @@
   </div>
 
   <script>
-    // --- CONFIGURE YOUR SCRIPT URL HERE ---
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyAKiDGXHrwJ2cEcJf9lr9ZOVV59eeCADibBpsnWg5RIBY-ikgxqfWsM80DIWlpmLEFyg/exec";
     
     const params = new URLSearchParams(window.location.search);
     const assetParam = params.get('asset');
-    const modeParam = params.get('mode') || (assetParam ? 'round' : 'admin');
+    let modeParam = params.get('mode') || (assetParam ? 'round' : 'admin');
     let selectedStatus = "";
 
     window.onload = function() {
@@ -110,7 +112,6 @@
       document.getElementById('mainApp').classList.remove('hidden');
       document.getElementById('sName').innerText = n;
       
-      // Fetch assets from Google Script
       fetch(SCRIPT_URL)
         .then(res => res.json())
         .then(list => {
@@ -128,15 +129,22 @@
         document.getElementById('assetHeader').classList.remove('hidden');
         document.getElementById('assetPicker').classList.add('hidden');
         document.getElementById('woLoc').value = assetParam;
-      } else if (modeParam === 'admin') {
+      }
+      
+      // If we ARE NOT in admin mode (e.g. forced via URL), hide the navigation tabs
+      if (modeParam === 'admin') {
         document.getElementById('navTabs').classList.remove('hidden');
       }
+
       setMode(modeParam);
     }
 
     function setMode(m) {
+      modeParam = m;
       document.getElementById('roundForm').classList.toggle('hidden', m !== 'round');
       document.getElementById('woForm').classList.toggle('hidden', m !== 'workorder');
+      document.getElementById('t1').classList.toggle('active', m === 'round');
+      document.getElementById('t2').classList.toggle('active', m === 'workorder');
     }
 
     function selectStatus(s) {
@@ -162,7 +170,7 @@
         status: selectedStatus,
         notes: notes,
         staff: localStorage.getItem('staffName')
-      });
+      }, true);
     }
 
     function doSubmitWO() {
@@ -174,10 +182,11 @@
         staff: localStorage.getItem('staffName'),
         email: localStorage.getItem('staffEmail'),
         wantsUpdate: true
-      });
+      }, false);
     }
 
-    function sendData(payload) {
+    function sendData(payload, isRound) {
+      document.getElementById('statusMsg').innerText = "Submitting...";
       document.getElementById('loading').style.display = 'flex';
       fetch(SCRIPT_URL, {
         method: 'POST',
@@ -186,11 +195,25 @@
       .then(res => res.json())
       .then(res => {
         document.getElementById('loading').style.display = 'none';
-        document.getElementById('mainApp').classList.add('hidden');
-        document.getElementById('successView').classList.remove('hidden');
-        document.getElementById('successMsg').innerText = res.message;
+        
+        // --- REDIRECTION LOGIC ---
+        if (isRound && !selectedStatus.includes('🟢')) {
+          // If Round was Yellow or Red, redirect to Work Order
+          alert("Status Recorded. Redirecting to file a Work Order...");
+          document.getElementById('woLoc').value = payload.asset;
+          setMode('workorder');
+          window.scrollTo(0,0);
+        } else {
+          // Otherwise, show final success screen
+          document.getElementById('mainApp').classList.add('hidden');
+          document.getElementById('successView').classList.remove('hidden');
+          document.getElementById('successMsg').innerText = res.message;
+        }
       })
-      .catch(err => alert("Error: Use a better signal area."));
+      .catch(err => {
+        document.getElementById('loading').style.display = 'none';
+        alert("Submission failed. Check your signal.");
+      });
     }
   </script>
 </body>
